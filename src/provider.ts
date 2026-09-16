@@ -39,9 +39,10 @@ export interface AuthProvider {
   /**
    * Starts email/password sign-in.
    *
-   * Supabase performs the exchange in-page and resolves with a session. Cognito
-   * cannot (the Hosted UI owns the credential form), so it redirects and
-   * resolves with a null session.
+   * Cognito cannot exchange credentials in-page: the Hosted UI owns the
+   * credential form. This redirects and resolves with a null session, and the
+   * callback route performs the real exchange. A caller that assumes a session
+   * comes back is wrong.
    */
   signInWithPassword(email: string, password: string): Promise<AuthResult<CredentialSignInData>>;
 
@@ -79,7 +80,7 @@ export interface AuthProvider {
 
   /**
    * Returns the bearer token for API calls, refreshing when near expiry.
-   * This is what `apiClient.ts` consumes via `getSupabaseAccessToken()`.
+   * This is what `apiClient.ts` consumes via the app's `getAccessToken()`.
    */
   getAccessToken(): Promise<string | null>;
 

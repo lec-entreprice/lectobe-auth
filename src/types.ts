@@ -1,24 +1,17 @@
 /**
  * Provider-neutral authentication types.
  *
- * ## Supabase structural compatibility (important)
+ * ## These types are now the only source of truth
  *
- * `AuthUser` and `AuthSession` are deliberately shaped as structural *subtypes*
- * of the `User` and `Session` types exported by `@supabase/supabase-js`.
+ * `AuthUser` and `AuthSession` were originally shaped as structural *subtypes*
+ * of `User` and `Session` from `@supabase/supabase-js`, so each frontend's
+ * `AuthContext.tsx` — which imported those types directly — kept compiling
+ * through the migration without being touched.
  *
- * Each frontend's `AuthContext.tsx` is typed as `useState<Session | null>` and
- * `useState<User | null>` against Supabase's types, and that file must keep the
- * exact shape it exposes today. Because the values returned here are assignable
- * to Supabase's types, the context keeps compiling without being touched, and
- * no `any` has to leak through this public interface to make that work.
- *
- * Concretely this means every field Supabase declares as required is declared
- * here too, with a compatible type:
- *   - `User`    requires id, aud, created_at, app_metadata, user_metadata
- *   - `Session` requires access_token, refresh_token, expires_in, token_type, user
- *
- * Do not narrow these fields (for example to `Record<string, string>`); doing so
- * breaks the assignment in `AuthContext.tsx`.
+ * Supabase is gone, so that bridge is gone with it. `AuthContext.tsx` now
+ * imports `AuthUser` and `AuthSession` from here, and this package no longer
+ * takes a dependency on any Supabase type. The field shapes below are unchanged:
+ * they describe the session the Cognito provider actually produces.
  */
 
 /**
@@ -28,14 +21,20 @@
  */
 export type UserRole = 'admin' | 'client' | 'reviewer' | 'annotator' | 'user' | string;
 
-/** Which backend is currently serving authentication. */
-export type AuthProviderName = 'cognito' | 'supabase';
+/**
+ * Which backend is currently serving authentication.
+ *
+ * A single-member union rather than a bare `'cognito'`: it keeps the type
+ * meaningful at call sites and makes a future provider a deliberate change to
+ * this line, rather than a value that quietly appears somewhere.
+ */
+export type AuthProviderName = 'cognito';
 
 /**
  * Authentication state transitions emitted by `onAuthStateChange`.
  *
- * This mirrors the subset of Supabase's `AuthChangeEvent` the frontends rely on,
- * so the callback signature stays drop-in compatible.
+ * The names are kept from the Supabase-era API so existing call sites and
+ * `switch` statements did not have to change. The Cognito provider emits them.
  */
 export type AuthChangeEvent =
   | 'INITIAL_SESSION'
@@ -45,9 +44,11 @@ export type AuthChangeEvent =
   | 'USER_UPDATED';
 
 /**
- * Server-controlled claims. Supabase exposed this as `app_metadata` and the
- * existing role logic reads `app_metadata.role` from it, so the Cognito provider
- * normalises its `cognito:groups` claim into this same field.
+ * Server-controlled claims, read as `app_metadata.role`.
+ *
+ * The field name is kept from the Supabase era because the role logic in every
+ * portal reads it. The Cognito provider normalises its `cognito:groups` claim
+ * into this same field, so callers never learn which provider produced it.
  */
 export interface AuthAppMetadata {
   role?: string;
@@ -56,7 +57,7 @@ export interface AuthAppMetadata {
   [key: string]: unknown;
 }
 
-/** The authenticated principal. Structurally assignable to Supabase's `User`. */
+/** The authenticated principal. */
 export interface AuthUser {
   id: string;
   aud: string;
@@ -67,7 +68,7 @@ export interface AuthUser {
   user_metadata: Record<string, unknown>;
 }
 
-/** A live session. Structurally assignable to Supabase's `Session`. */
+/** A live session. */
 export interface AuthSession {
   access_token: string;
   refresh_token: string;

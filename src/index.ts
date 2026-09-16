@@ -2,15 +2,20 @@
  * `@lectobe/auth` — shared, provider-agnostic authentication for the Lectobe
  * frontends.
  *
- * Two providers ship behind one interface:
+ * One provider ships behind the interface:
  *
- *   - `cognito`  — AWS Cognito Hosted UI, Authorization Code + PKCE, with Google
- *                  federation. Plain `fetch`, no extra dependencies.
- *   - `supabase` — the existing behaviour, preserved method-for-method.
+ *   - `cognito` — AWS Cognito Hosted UI, Authorization Code + PKCE, with Google
+ *                 federation. Plain `fetch`, no extra dependencies.
  *
- * Which one is active is chosen by the consuming app (see `resolveAuthProviderName`,
- * driven by `VITE_AUTH_PROVIDER`) and defaults to `supabase` so the migration is
- * reversible.
+ * The Supabase provider was removed along with the backend. It is not deprecated
+ * or dormant — the code is gone, the peer dependency is gone, and
+ * `resolveAuthProviderName` rejects `supabase` by name rather than falling back
+ * to it. A second provider would be a deliberate addition to this package, not a
+ * value that appears in an environment variable.
+ *
+ * Which one is active is chosen by the consuming app via `resolveAuthProviderName`,
+ * driven by `VITE_AUTH_PROVIDER`. There is no default: a missing or misspelled
+ * value is reported instead of silently selecting a backend.
  *
  * See README.md for the flow, the environment variables and the storage model.
  */
@@ -44,15 +49,6 @@ export {
   decodeJwtClaims,
   roleFromGroups,
 } from './cognito';
-
-export type { SupabaseConfig } from './supabase';
-export {
-  createSupabaseClient,
-  createSupabaseProvider,
-  hasValidSupabaseUrl,
-  isBrowserSafeKey,
-  isSupabaseConfigValid,
-} from './supabase';
 
 export type { AuthService, CreateAuthConfig } from './createAuth';
 export {

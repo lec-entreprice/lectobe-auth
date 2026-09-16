@@ -233,9 +233,9 @@ interface TokenEndpointResponse {
  * Authorization Code + PKCE provider for the Cognito Hosted UI.
  *
  * Deliberately built on plain `fetch` rather than `amazon-cognito-identity-js`:
- * the library is heavy, it duplicates a flow the frontends already run for
- * Supabase, and it cannot drive the Hosted UI (which is what serves Google
- * federation here).
+ * the library is heavy, and it cannot drive the Hosted UI — which is what serves
+ * Google federation here, so it would be the wrong tool for the only sign-in
+ * method this platform uses.
  */
 export class CognitoAuthProvider implements AuthProvider {
   public readonly name = 'cognito' as const;
@@ -579,8 +579,8 @@ export class CognitoAuthProvider implements AuthProvider {
    * forwarded as `login_hint` so the field arrives pre-filled.
    *
    * The resolved session is therefore always `null`; the callback route performs
-   * the real exchange. The signature and envelope match the Supabase provider so
-   * `AuthContext` is unaffected.
+   * the real exchange. The return envelope is identical to `signInWithGoogle`,
+   * so `AuthContext` handles both the same way.
    */
   public async signInWithPassword(email: string, _password: string): Promise<AuthResult<CredentialSignInData>> {
     const url = await this.buildAuthorizeUrl({ loginHint: email });
@@ -635,8 +635,9 @@ export class CognitoAuthProvider implements AuthProvider {
   }
 
   /**
-   * Clears local credentials only, matching the previous
-   * `supabase.auth.signOut({ scope: 'local' })` behaviour.
+   * Clears local credentials only, deliberately leaving any server-side session
+   * alone. Signing out locally and revoking globally are different operations,
+   * and conflating them logs a user out of every device by accident.
    *
    * The Cognito SSO session cookie is intentionally left in place; use
    * `getLogoutUrl()` when a federated sign-out is actually wanted.
@@ -781,8 +782,9 @@ export class CognitoAuthProvider implements AuthProvider {
  * Creates the Cognito Authorization Code + PKCE provider.
  *
  * Returns the concrete class rather than the bare `AuthProvider` so callers can
- * reach `getLogoutUrl()`, which is Cognito-specific (a Supabase provider has no
- * equivalent federated sign-out endpoint).
+ * reach `getLogoutUrl()`. That is Cognito-specific: federated sign-out needs the
+ * Hosted UI's `/logout` endpoint to clear the SSO cookie, and the generic
+ * `signOut()` above intentionally does not do that.
  */
 export function createCognitoProvider(config: CognitoConfig): CognitoAuthProvider {
   return new CognitoAuthProvider(config);
