@@ -115,6 +115,9 @@ export class AuthCapabilityError extends Error {
 
 /** Raised when a deployment is missing the configuration a provider needs. */
 export class AuthConfigurationError extends Error {
+  /** Which provider the missing configuration belongs to. */
+  readonly provider: AuthProviderName;
+
   constructor(provider: AuthProviderName, message: string) {
     super(message);
     this.name = 'AuthConfigurationError';

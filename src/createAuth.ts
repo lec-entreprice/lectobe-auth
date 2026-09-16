@@ -142,7 +142,10 @@ export function validateTokenScopes(token: string, requiredScopes: string[]): bo
  * without losing their receiver, which is how the existing barrel exported them.
  */
 export function createAuthService(config: CreateAuthConfig = {}): AuthService {
-  const providerName = config.providerName ?? 'supabase';
+  // `provider` is the field the type declares. Reading `providerName` returned
+  // undefined every time, so the service silently defaulted to Supabase no matter
+  // what the caller passed -- a configuration that looked honoured and was not.
+  const providerName = config.provider ?? 'supabase';
 
   const provider: AuthProvider = config.provider ?? (providerName === 'cognito'
     ? createCognitoProvider(config.cognito ?? { region: '', userPoolId: '', clientId: '', domain: '', redirectUri: '' })
