@@ -1,6 +1,4 @@
 import type { AuthProvider } from './provider';
-import type { CognitoConfig } from './cognito';
-import { createCognitoProvider } from './cognito';
 import type {
   AuthChangeEvent,
   AuthProviderName,
@@ -33,10 +31,21 @@ export interface AuthService extends AuthProvider {
 }
 
 export interface CreateAuthConfig {
-  /** Which backend to use. Required — there is no default. */
-  provider?: AuthProviderName;
-  /** Required when `provider` is `cognito`. */
-  cognito?: CognitoConfig;
+  /**
+   * The provider to wrap.
+   *
+   * Injected rather than constructed here from a name. The app's auth client
+   * builds it, because only the app knows its redirect URIs, its logout URI and
+   * how it reports errors. A second provider constructed inside this factory
+   * would be a different instance with different configuration, and the two
+   * would drift apart without anything failing.
+   *
+   * This replaces an earlier `provider?: AuthProviderName` plus `cognito?`
+   * pair, which read as "pass a name and I will build it" but was called with a
+   * provider object — so the object was discarded and a second, differently
+   * configured provider was silently constructed in its place.
+   */
+  provider: AuthProvider;
   /** Role applied when the provider yields nothing. Defaults to `client`. */
   defaultRole?: UserRole;
   /**
@@ -162,30 +171,24 @@ export function validateTokenScopes(token: string, requiredScopes: string[]): bo
  * methods can be destructured (`export const signOut = authService.signOut`)
  * without losing their receiver, which is how the existing barrel exported them.
  */
-export function createAuthService(config: CreateAuthConfig = {}): AuthService {
-  // `provider` is the field the type declares. Reading `providerName` returned
-  // undefined every time, so the service silently defaulted to Supabase no matter
-  // what the caller passed -- a configuration that looked honoured and was not.
+export function createAuthService(config: CreateAuthConfig): AuthService {
+  // The caller's provider, used as given.
   //
-  // There is no fallback value now. An unspecified provider is a programming
-  // error in the caller, and picking one for them is how the silent default got
-  // in. `resolveAuthProviderName` is the entry point that reads the environment
-  // and reports a bad value; this only enforces that a value was supplied.
-  const providerName = config.provider;
-  if (!providerName) {
+  // The previous version read `config.providerName` — a field the type does not
+  // declare, so it was always `undefined` — and then defaulted to `supabase`
+  // regardless of what the caller passed. A configuration that looks honoured
+  // and is not is worse than one that is missing: nothing errors, and the
+  // symptom is "I set the provider and nothing changed".
+  //
+  // There is no fallback now. A missing provider is a programming error in the
+  // caller, and inventing one is how the silent default got in.
+  const provider = config.provider;
+  if (!provider) {
     throw new Error(
       'createAuthService requires an explicit `provider`. ' +
-        'Resolve it with resolveAuthProviderName(import.meta.env.VITE_AUTH_PROVIDER).',
+        'Build it in the app’s auth client and pass it in.',
     );
   }
-
-  // `config.provider` is a NAME. Assigning it here would be a string where an
-  // object is expected, and there is no supported way to inject a pre-built
-  // provider -- so the expression was dead code that happened to typecheck
-  // only because the union allowed it. The name selects the implementation.
-  const provider: AuthProvider = createCognitoProvider(
-    config.cognito ?? { region: '', userPoolId: '', clientId: '', domain: '', redirectUri: '' },
-  );
 
   const resolveRole = (user: AuthUser | null | undefined): UserRole =>
     config.getUserRole ? config.getUserRole(user) : provider.getUserRole(user);
@@ -235,4 +238,35 @@ export function createAuthService(config: CreateAuthConfig = {}): AuthService {
     parseJwtScopes,
     validateTokenScopes,
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Reading user metadata                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Reads a user-metadata value, but only when it is actually a string.
+ *
+ * `AuthUser.user_metadata` is `Record<string, unknown>`, which is correct — the
+ * provider controls what lands there and it is not a fixed schema. But every
+ * call site wants a string to display, and there were eleven of them doing:
+ *
+ *     user?.user_metadata?.full_name || 'Client'
+ *
+ * The left operand is `unknown`, so the expression's type is not `string`. Two
+ * sites "fixed" it with `as string`, which asserts a shape nothing verified: a
+ * provider that returned a number or an object for `full_name` would render
+ * `[object Object]` and type-check perfectly.
+ *
+ * This checks. A non-string, an empty string and a missing key all yield
+ * `undefined`, so the caller's own fallback applies.
+ */
+export function userMetadataString(
+  user: AuthUser | null | undefined,
+  key: string,
+): string | undefined {
+  const value = user?.user_metadata?.[key];
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }

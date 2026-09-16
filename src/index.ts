@@ -53,6 +53,7 @@ export {
 export type { AuthService, CreateAuthConfig } from './createAuth';
 export {
   createAuthService,
+  userMetadataString,
   hasAllScopes,
   hasAnyScope,
   hasScope,
