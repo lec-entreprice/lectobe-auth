@@ -64,3 +64,15 @@ export {
   resolveAuthProviderName,
   validateTokenScopes,
 } from './createAuth';
+
+/* ---------------------------------------------------------------------------
+ * Auth tracking
+ *
+ * Every authentication decision can produce an event. The tracker is optional
+ * and defaults to a no-op: a provider without one still works, and a tracker
+ * that fails never fails a sign-in.
+ * ------------------------------------------------------------------------- */
+
+export type { AuthEvent, AuthEventType, AuthMethod, AuthTracker } from './tracking/types';
+export { createTracker, authEvent } from './tracking/tracker';
+export type { CreateTrackerOptions } from './tracking/tracker';

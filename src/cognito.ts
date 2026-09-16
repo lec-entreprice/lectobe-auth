@@ -20,7 +20,18 @@ import type {
 /* Configuration                                                              */
 /* -------------------------------------------------------------------------- */
 
+import type { AuthTracker } from './tracking/types';
+import { authEvent } from './tracking/tracker';
+
+/** A tracker that does nothing, so a provider without one is still safe to call. */
+const NO_TRACKER: AuthTracker = { track: () => {} };
+
 export interface CognitoConfig {
+  /**
+   * Where auth events go. Absent means they are dropped -- authentication
+   * must never fail because telemetry did.
+   */
+  tracker?: AuthTracker;
   /** e.g. `us-east-1` */
   region: string;
   /** e.g. `us-east-1_Pyka8fOtL` */
@@ -241,7 +252,20 @@ export class CognitoAuthProvider implements AuthProvider {
 
   private readonly listeners = new Set<(event: AuthChangeEvent, session: AuthSession | null) => void>();
 
+  private readonly tracker: AuthTracker;
+
+  /**
+   * The most recent user id this provider saw.
+   *
+   * A sign-out event is worth recording even though the session is about to
+   * be cleared, and by the time the event is built the token is gone. This
+   * is the id captured before that, so the event names a person rather
+   * than being anonymous.
+   */
+  private lastKnownUserId?: string;
+
   constructor(config: CognitoConfig) {
+    this.tracker = config.tracker ?? NO_TRACKER;
     this.config = config;
     this.storage = config.storage ?? createDefaultStorage();
     this.prefix = config.storagePrefix ?? DEFAULT_PREFIX;
@@ -424,6 +448,10 @@ export class CognitoAuthProvider implements AuthProvider {
   }
 
   private persist(session: AuthSession): void {
+    // Remembered here rather than at each call site: `persist` is the one
+    // place a resolved session lands, so a sign-out can still name the
+    // person after the token has been cleared.
+    if (session?.user?.id) this.lastKnownUserId = session.user.id;
     const stored: StoredSession = {
       access_token: session.access_token,
       refresh_token: session.refresh_token,
@@ -535,6 +563,7 @@ export class CognitoAuthProvider implements AuthProvider {
   /* ------------------------------- Methods -------------------------------- */
 
   public async signInWithGoogle(options: SignInWithGoogleOptions = {}): Promise<AuthResult<OAuthSignInData>> {
+    this.tracker.track(authEvent('sign_in_started', 'google'));
     const url = await this.buildAuthorizeUrl({
       identityProvider: 'Google',
       redirectTo: options.redirectTo,
@@ -613,6 +642,7 @@ export class CognitoAuthProvider implements AuthProvider {
    * `getLogoutUrl()` when a federated sign-out is actually wanted.
    */
   public async signOut(): Promise<AuthSignOutResult> {
+    this.tracker.track(authEvent('sign_out', 'unknown', { userId: this.lastKnownUserId }));
     try {
       this.storage.removeItem(`${this.prefix}session`);
       this.clearPkceState();
@@ -674,6 +704,9 @@ export class CognitoAuthProvider implements AuthProvider {
    * from the current URL, which is where the Hosted UI put it.
    */
   public async exchangeCodeForSession(code: string, returnedState?: string | null): Promise<AuthSession> {
+    // Two outcomes, both recorded. A failed exchange with no event is the
+    // hardest kind of auth bug to see: the user says "it did not work" and
+    // there is nothing to look at.
     if (!this.isConfigured) {
       throw new AuthConfigurationError('cognito', 'Cognito authentication is not configured for this environment.');
     }
