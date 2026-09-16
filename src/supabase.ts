@@ -30,6 +30,23 @@ export interface SupabaseConfig {
   sanitizeRedirect?: (candidate: string | undefined, fallback: string) => string;
   /** Role applied when `app_metadata.role` is absent. Defaults to `client`. */
   defaultRole?: UserRole;
+  /**
+   * Options passed through to the Supabase client's `auth` config.
+   *
+   * Read four times below and previously undeclared, so every one of those reads
+   * was against a property the type said did not exist — the build passed only
+   * because the frontend buildspec runs `tsc || true`.
+   *
+   * The portals pin `detectSessionInUrl: false` here so the callback route owns
+   * the code exchange and a second automatic exchange cannot race it. That is
+   * application policy, which is why it is supplied rather than hardcoded.
+   */
+  authOptions?: {
+    flowType?: 'implicit' | 'pkce';
+    persistSession?: boolean;
+    autoRefreshToken?: boolean;
+    detectSessionInUrl?: boolean;
+  };
   /** Pre-built client to reuse, so a frontend creates exactly one. */
   client?: SupabaseClient | null;
   onError?: (message: string, error: unknown) => void;
