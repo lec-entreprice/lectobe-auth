@@ -62,6 +62,14 @@ export interface AuthEvent {
  * network call, is worse than no tracking at all: authentication must not fail
  * because telemetry did.
  */
+/**
+ * What a call site supplies. `sessionId` and `app` are added by the tracker,
+ * so requiring them here would force every caller to invent values the
+ * tracker immediately overwrites -- and would let a caller set an `app` that
+ * disagrees with the tracker's own.
+ */
+export type AuthEventInput = Omit<AuthEvent, 'sessionId' | 'app'>;
+
 export interface AuthTracker {
-  track(event: AuthEvent): void;
+  track(event: AuthEventInput): void;
 }

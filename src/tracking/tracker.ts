@@ -1,4 +1,4 @@
-import type { AuthEvent, AuthEventType, AuthMethod, AuthTracker } from './types';
+import type { AuthEvent, AuthEventInput, AuthEventType, AuthMethod, AuthTracker } from './types';
 
 /**
  * Auth tracking.
@@ -97,7 +97,7 @@ export function createTracker(options: CreateTrackerOptions): AuthTracker {
   }
 
   return {
-    track(event: AuthEvent): void {
+    track(event: AuthEventInput): void {
       try {
         queue.push({ ...event, sessionId, app });
         if (queue.length >= batchSize) flush();
@@ -118,6 +118,6 @@ export function authEvent(
   type: AuthEventType,
   method: AuthMethod,
   extra: { userId?: string; reason?: string } = {},
-): Omit<AuthEvent, 'sessionId' | 'app'> {
+): AuthEventInput {
   return { type, method, at: Date.now(), ...extra };
 }

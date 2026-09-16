@@ -73,6 +73,6 @@ export {
  * that fails never fails a sign-in.
  * ------------------------------------------------------------------------- */
 
-export type { AuthEvent, AuthEventType, AuthMethod, AuthTracker } from './tracking/types';
+export type { AuthEvent, AuthEventInput, AuthEventType, AuthMethod, AuthTracker } from './tracking/types';
 export { createTracker, authEvent } from './tracking/tracker';
 export type { CreateTrackerOptions } from './tracking/tracker';

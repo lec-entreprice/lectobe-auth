@@ -147,9 +147,13 @@ export function createAuthService(config: CreateAuthConfig = {}): AuthService {
   // what the caller passed -- a configuration that looked honoured and was not.
   const providerName = config.provider ?? 'supabase';
 
-  const provider: AuthProvider = config.provider ?? (providerName === 'cognito'
+  // `config.provider` is a NAME. Assigning it here would be a string where an
+  // object is expected, and there is no supported way to inject a pre-built
+  // provider -- so the expression was dead code that happened to typecheck
+  // only because the union allowed it. The name selects the implementation.
+  const provider: AuthProvider = providerName === 'cognito'
     ? createCognitoProvider(config.cognito ?? { region: '', userPoolId: '', clientId: '', domain: '', redirectUri: '' })
-    : createSupabaseProvider(config.supabase ?? { url: '', anonKey: '', callbackUrl: '', recoveryCallbackUrl: '' }));
+    : createSupabaseProvider(config.supabase ?? { url: '', anonKey: '', callbackUrl: '', recoveryCallbackUrl: '' });
 
   const resolveRole = (user: AuthUser | null | undefined): UserRole =>
     config.getUserRole ? config.getUserRole(user) : provider.getUserRole(user);
